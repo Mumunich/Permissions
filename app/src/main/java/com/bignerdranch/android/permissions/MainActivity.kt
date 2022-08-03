@@ -8,12 +8,29 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions
+import androidx.activity.result.contract.ActivityResultContracts.RequestPermission
 import androidx.appcompat.app.AlertDialog
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.bignerdranch.android.permissions.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
+
+    private val feature1PermissionsRequestLauncher = registerForActivityResult(
+        RequestMultiplePermissions(),
+        ::onGotPermissionsResultForFeatures1
+        )
+
+    private val feature2PermissionsRequestLauncher = registerForActivityResult(
+        RequestPermission(),
+        ::onGotPermissionsResultForFeatures2
+        )
+
+
+    // Что бы использовать Activity Result Api
+    // нужно создать лаунчер,вызвать его,передать ему нужные разрешения и при создании лаунчера,определить логику обработки результатов
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val binding = ActivityMainBinding.inflate(layoutInflater)
@@ -21,62 +38,38 @@ class MainActivity : AppCompatActivity() {
 
         // Проверяем наличие разрешения
         binding.requestLocationButton.setOnClickListener {
-            if( ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED &&
-                ContextCompat.checkSelfPermission(this,Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED){
-                onLocationPermissionGranted()
-            } else{
-                // Если разрешение отсутствует,то запрашиваем его
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION),
-                    RQ_PERMISSIONS_FOR_FEATURES_1_CODE
-                )
-            }
+            feature1PermissionsRequestLauncher.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION))
         }
 
         // Можно и не проверять наличие разрешения,если у приложения будет разрешение,то сразу вызовется onRequestPermissionsResult
         binding.requestCameraAndRecordButton.setOnClickListener {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.CAMERA),
-                    RQ_PERMISSIONS_FOR_FEATURES_2_CODE
-                )
+            feature2PermissionsRequestLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
-    // Разные кнопки,запрашивают разные разрешения,так что у них будут разные requestCode
-    // 1 аргумент отвечает за то какой именно запрос вернулся,2 и 3 это результаты,2 массив разрешений,3 массив результатов(дано разрешение или нет)
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        when(requestCode){
-            RQ_PERMISSIONS_FOR_FEATURES_1_CODE -> {
-                // grantResults[0] == PackageManager.PERMISSION_GRANTED && grantResults[1] == PackageManager.PERMISSION_GRANTED
-                // можно заменить на grantResults.all { it == PackageManager.PERMISSION_GRANTED }
-                if(grantResults.all { it == PackageManager.PERMISSION_GRANTED }){
-                    onLocationPermissionGranted()
-                } else{
-                    if (!shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION)){
-                        askUserForOpeningAppSettings()
-                    } else {
-                        Toast.makeText(this,"Permission denied",Toast.LENGTH_SHORT).show()
-                    }
-                }
+
+    private fun onGotPermissionsResultForFeatures1(grantResults:Map<String,Boolean>){
+        // Если все значения внутри этой мапы равны тру,то показываем сообщение
+        if(grantResults.entries.all { it.value  }){
+            onLocationPermissionGranted()
+        } else{
+            if (!shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_COARSE_LOCATION)){
+                askUserForOpeningAppSettings()
+            } else {
+                Toast.makeText(this,"Permission denied",Toast.LENGTH_SHORT).show()
             }
-            RQ_PERMISSIONS_FOR_FEATURES_2_CODE -> {
-                if(grantResults[0] == PackageManager.PERMISSION_GRANTED){
-                    onCameraAndRecordPermissionGranted()
-                } else {
-                    // Если пользователь не дал разрешение и решил не показывать диалог
-                    if (!shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)){
-                        askUserForOpeningAppSettings()
-                    } else {
-                        Toast.makeText(this,"Permission denied",Toast.LENGTH_SHORT).show()
-                    }
-                }
+        }
+    }
+
+    private fun onGotPermissionsResultForFeatures2(granted:Boolean){
+        if(granted){
+            onCameraAndRecordPermissionGranted()
+        } else {
+            // Если пользователь не дал разрешение и решил не показывать диалог
+            if (!shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)){
+                askUserForOpeningAppSettings()
+            } else {
+                Toast.makeText(this,"Permission denied",Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -103,6 +96,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    // Context это мост к возможностям операционной системы андроид и это источник инфы об окружении в котором выполняется приложение
+    // это глаза и уши,он позволяет видеть всё андроид специфическое и получать инфу о том где  и как выполняется приложение
+    // а так же руки и ноги,он позволяет взаимодействовать со всеми андроид специфическими функциями(показ уведомлений,управление адаптерами и тд)
+    // активити наследуется от контекста,поэтому она сама по себе является контекстом,сервисы и application тоже имеют контекст
     private fun onLocationPermissionGranted(){
         Toast.makeText(this,"Location permission is granted",Toast.LENGTH_SHORT).show()
     }
